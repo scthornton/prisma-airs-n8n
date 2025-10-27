@@ -1,0 +1,213 @@
+{
+  "name": "Prisma AIRS + Claude Chat (Simple)",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "chat-trigger",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 360],
+      "webhookId": "simple-airs-chat"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://service.api.aisecurity.paloaltonetworks.com/v1/scan/sync/request",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-pan-token",
+              "value": "={{ $env.AIRS_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"tr_id\": \"{{ $execution.id }}-chat\",\n  \"ai_profile\": {\n    \"profile_name\": \"{{ $env.AIRS_API_PROFILE_NAME }}\"\n  },\n  \"metadata\": {\n    \"app_user\": \"n8n-user\",\n    \"ai_model\": \"claude-sonnet-4-5\",\n    \"application_name\": \"n8n-chat\"\n  },\n  \"contents\": [\n    {\n      \"prompt\": \"{{ $json.chatInput }}\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "prisma-scan",
+      "name": "Prisma AIRS Scan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 360]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-block",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "block",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "safety-check",
+      "name": "Is Safe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 360]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-5-20250929\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $('When chat message received').item.json.chatInput }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "call-claude",
+      "name": "Call Claude API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 260],
+      "credentials": {
+        "anthropicApi": {
+          "id": "anthropic-api",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "response-text",
+              "name": "output",
+              "value": "={{ $json.content[0].text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1120, 260]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "blocked-msg",
+              "name": "output",
+              "value": "=🛡️ **Security Alert: Message Blocked**\n\nYour message was flagged by Prisma AIRS and cannot be processed.\n\n**Action:** {{ $json.action }}\n\n**Details:** {{ JSON.stringify($json.threat_info || {}, null, 2) }}\n\nPlease rephrase your message.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "blocked-msg",
+      "name": "Blocked Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 460]
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Prisma AIRS Scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prisma AIRS Scan": {
+      "main": [
+        [
+          {
+            "node": "Is Safe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Safe?": {
+      "main": [
+        [
+          {
+            "node": "Call Claude API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Blocked Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Claude API": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-15T00:00:00.000Z",
+  "versionId": "1"
+}

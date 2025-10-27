@@ -1,0 +1,70 @@
+version: '3.8'
+
+# Project name to avoid conflicts
+name: prisma-airs-n8n
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: n8n
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_storage:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h localhost -U n8n']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - n8n-net
+
+  n8n:
+    image: n8nio/n8n:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=n8n
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://localhost:5678/
+      # Load environment variables for APIs
+      - AIRS_API_KEY=${AIRS_API_KEY}
+      - AIRS_API_PROFILE_NAME=${AIRS_API_PROFILE_NAME}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Google Cloud credentials for Vertex AI
+      - GOOGLE_CLOUD_PROJECT_ID=${GOOGLE_CLOUD_PROJECT_ID}
+      - GOOGLE_APPLICATION_CREDENTIALS=/home/node/.gcp/service-account-key.json
+    ports:
+      - '5678:5678'
+    volumes:
+      - n8n_storage:/home/node/.n8n
+      - ./sthornton-df21-17d35f6847ab.json:/home/node/.gcp/service-account-key.json:ro
+    networks:
+      - n8n-net
+    healthcheck:
+      test: ['CMD', 'node', '-e', "require('http').get('http://localhost:5678/healthz', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_storage:
+  n8n_storage:
+
+networks:
+  n8n-net:
+    driver: bridge

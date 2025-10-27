@@ -1,0 +1,336 @@
+{
+  "name": "Prisma AIRS + Claude (Simple)",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b863aac9-a292-4da0-ad38-b58dae8b2bff",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "21d85f2a-d3ca-404d-ba95-937d227d8819",
+              "name": "prompt",
+              "value": "={{ $json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "fdefdabe-df81-4b7c-b7f3-1dd0a0726ada",
+              "name": "ai_model",
+              "value": "gpt-oss:20b",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c1806f7c-c29c-4fe9-b361-3b01da40262d",
+      "name": "Set Prompt & Model Info",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -1920,
+        -448
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5000a404-023c-4e71-a919-53fae47f5ef1",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "block",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b5c3eeca-bb5f-4c08-8001-662d9ac79d3c",
+      "name": "Blocked?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -1472,
+        -448
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {},
+      "id": "dc527d4b-c72e-4402-ade7-6a07ff32797b",
+      "name": "Block Prompt",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        -1168,
+        -448
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "// Smart Response Cleaning - Inline Version\nconst responseText = items[0].json.text || '';\n\n// Apply smart cleaning directly\nconst cleanResponse = responseText\n  .replace(/\\r\\n/g, '\\n')           // Normalize line endings\n  .replace(/\\r/g, '\\n')             // Convert \\r to \\n\n  .replace(/\\t/g, '    ')           // Convert tabs to spaces\n  .replace(/\\n{3,}/g, '\\n\\n')       // Max 2 consecutive newlines\n  .replace(/[ ]{3,}/g, '  ')        // Max 2 consecutive spaces\n  .trim();                          // Remove leading/trailing whitespace\n\nreturn {\n  ...items[0].json,\n  clean_response: cleanResponse,\n  original_response: responseText\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        -144
+      ],
+      "id": "aad6b152-a767-4526-a1ba-578160785d58",
+      "name": "Clean Response"
+    },
+    {
+      "parameters": {
+        "model": "gpt-oss:20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -1088,
+        80
+      ],
+      "id": "5308126a-728f-49f3-87b9-e71eb3631043",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "REPLACE_WITH_YOUR_OLLAMA_CREDENTIAL_ID",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## AI Model Selection\n\n**Available Models:**\n- OpenAI GPT (Add API Key)\n- Google Vertex Gemini (Add GCP Creds)\n- Anthropic Claude (Add API Key)\n- Ollama Local (setup local)\n\n",
+        "height": 284,
+        "width": 248,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1216,
+        240
+      ],
+      "typeVersion": 1,
+      "id": "e4ac8032-3e78-4487-8aad-f03167c4e3ac",
+      "name": "Model Selection Guide"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        []
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Set Prompt & Model Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Blocked?": {
+      "main": [
+        [
+          {
+            "node": "Log Blocked Content",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Block Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Block Prompt": {
+      "main": [
+        [
+          {
+            "node": "Log Blocked Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response Blocked?": {
+      "main": [
+        [
+          {
+            "node": "Block Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Safe Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Block Response": {
+      "main": [
+        [
+          {
+            "node": "Return Block Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Set Prompt & Model Info": {
+      "main": [
+        [
+          {
+            "node": "Prisma AIRS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Response": {
+      "main": [
+        [
+          {
+            "node": "Prisma AIRS1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prisma AIRS1": {
+      "main": [
+        [
+          {
+            "node": "Response Blocked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prisma AIRS": {
+      "main": [
+        [
+          {
+            "node": "Blocked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Clean Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP DeepWiki": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP Context7": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Vertex Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "REPLACE_WITH_YOUR_VERSION_ID",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "REPLACE_WITH_YOUR_INSTANCE_ID"
+  },
+  "id": "REPLACE_WITH_YOUR_WORKFLOW_ID",
+  "tags": []
+}

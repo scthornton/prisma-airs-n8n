@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@paloaltonetworks/n8n-nodes-prisma-airs": "^0.1.1"
+  }
+}

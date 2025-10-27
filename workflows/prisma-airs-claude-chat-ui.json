@@ -1,0 +1,198 @@
+{
+  "name": "Prisma AIRS Protected Chat (UI)",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "chat-trigger",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 360],
+      "webhookId": "prisma-airs-chat-ui"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://service.api.aisecurity.paloaltonetworks.com/v1/scan/sync/request",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-pan-token",
+              "value": "={{ $env.AIRS_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"tr_id\": \"{{ $execution.id }}-chat\",\n  \"ai_profile\": {\n    \"profile_name\": \"{{ $env.AIRS_API_PROFILE_NAME }}\"\n  },\n  \"metadata\": {\n    \"app_user\": \"n8n-chat-user\",\n    \"ai_model\": \"claude-sonnet-4-5\",\n    \"application_name\": \"n8n-prisma-airs-chat\"\n  },\n  \"contents\": [\n    {\n      \"prompt\": \"{{ $json.chatInput }}\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "prisma-airs-scan",
+      "name": "Prisma AIRS Security Scan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 360]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-blocked",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "block",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-safety",
+      "name": "Is Message Safe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 360]
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "Claude 3.5 Sonnet"
+        },
+        "options": {
+          "maxTokens": 4096,
+          "temperature": 0.7
+        }
+      },
+      "id": "claude-model",
+      "name": "Claude Sonnet 4.5",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.8,
+      "position": [1120, 140],
+      "credentials": {
+        "anthropicApi": {
+          "id": "anthropic-api",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a helpful AI assistant. The user's message has been verified as safe by Prisma AIRS security scanning.\n\nUser message: {{ $('When chat message received').item.json.chatInput }}\n\nPlease provide a helpful, accurate, and safe response.",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "id": "ai-agent",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [900, 140],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "blocked-message",
+              "name": "output",
+              "value": "=🛡️ **Security Alert: Message Blocked by Prisma AIRS**\n\nYour message was flagged and cannot be processed.\n\n**Action:** {{ $json.action || 'blocked' }}\n\n**Threat Details:**\n{{ $json.threat_info ? JSON.stringify($json.threat_info, null, 2) : 'Security policy violation detected' }}\n\n**Scan ID:** {{ $json.tr_id || 'N/A' }}\n\nPlease rephrase your message to comply with security policies.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "security-block",
+      "name": "Security Block Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 580]
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Prisma AIRS Security Scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prisma AIRS Security Scan": {
+      "main": [
+        [
+          {
+            "node": "Is Message Safe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Message Safe?": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Security Block Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Sonnet 4.5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-15T00:00:00.000Z",
+  "versionId": "1"
+}
