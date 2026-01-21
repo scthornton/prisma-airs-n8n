@@ -268,6 +268,7 @@ docker-compose ps
 3. **Monitor security events** - Check Prisma AIRS dashboard daily
 4. **Test security policies** - Verify blocking works as expected
 5. **Limit access** - Use n8n user permissions appropriately
+6. 
 
 ## 📝 License
 
