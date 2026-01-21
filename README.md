@@ -268,9 +268,14 @@ docker-compose ps
 3. **Monitor security events** - Check Prisma AIRS dashboard daily
 4. **Test security policies** - Verify blocking works as expected
 5. **Limit access** - Use n8n user permissions appropriately
-6. 
+6. **Review logs regularly** - Audit workflow executions for suspicious activity
 
 ## 📝 License
 
-This is a demonstration workflow for Prisma AIRS integration with n8n.
-# prisma-airs-n8n
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 📧 Contact
+
+- **Email:** scott@perfecxion.ai
+- **Alternative:** scthornton@gmail.com
+- **Security Issues:** See [SECURITY.md](SECURITY.md) for vulnerability reporting
